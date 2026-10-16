@@ -84,8 +84,9 @@ def kill_servers(wait_s: int = 45) -> None:
     log(f"WARNING: VRAM still at {gpu_used_mib()} MiB after {wait_s}s — continuing anyway")
 
 
-def start_server(mml: int, port: int, logdir: str, gpu_util: str) -> tuple[subprocess.Popen, str]:
-    path = os.path.join(logdir, f"vllm-mml{mml}.log")
+def start_server(mml: int, port: int, logdir: str, gpu_util: str, tag: str = "") -> tuple[subprocess.Popen, str]:
+    suffix = f"-{tag}" if tag else ""
+    path = os.path.join(logdir, f"vllm-mml{mml}{suffix}.log")
     f = open(path, "w")                                              # noqa: SIM115 - handed to Popen
     cmd = [VLLM_BIN, "serve", MODEL,
            "--tokenizer", TOKENIZER, "--quantization", "gguf",
@@ -165,6 +166,7 @@ def main() -> int:
     ap.add_argument("--prompt-mode", default="same", choices=["same", "unique"])
     ap.add_argument("--port", type=int, default=8082)
     ap.add_argument("--gpu-memory-utilization", default="0.45")
+    ap.add_argument("--tag", default="", help="suffix for log/result filenames, so sweeps do not overwrite each other")
     ap.add_argument("--ready-timeout", type=float, default=420)
     ap.add_argument("--out", default="results/kv-sweep.json")
     args = ap.parse_args()
@@ -190,14 +192,15 @@ def main() -> int:
     for mml in mmls:
         log(f"===== max-model-len {mml} =====")
         kill_servers()
-        proc, path = start_server(mml, args.port, logdir, args.gpu_memory_utilization)
+        proc, path = start_server(mml, args.port, logdir, args.gpu_memory_utilization, args.tag)
         ok, why = wait_ready(proc, args.port, args.ready_timeout)
         log(f"server for mml={mml}: {why}")
         entry: dict = {"max_model_len": mml, "server_up": ok, "ready": why, "port": args.port,
                        "bench_ok": False, "result_file": None}
         entry.update(parse_log(path))
         if ok:
-            json_out = os.path.join(ROOT, "results", f"vllm-gguf-mml{mml}.json")
+            suffix = f"-{args.tag}" if args.tag else ""
+            json_out = os.path.join(ROOT, "results", f"vllm-gguf-mml{mml}{suffix}.json")
             bench_ok, _ = run_bench(args.port, args.concurrency, args.requests, args.max_tokens,
                                     args.prompt_mode, json_out, sweep["host_note"])
             entry["bench_ok"] = bench_ok

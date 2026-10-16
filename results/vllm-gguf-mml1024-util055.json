@@ -1,0 +1,114 @@
+{
+  "generated_at": "2026-10-17 00:53:15",
+  "prompt_mode": "same",
+  "prompt_chars": 2855,
+  "max_tokens": 128,
+  "requests_per_level": 64,
+  "concurrency_levels": [
+    8,
+    16,
+    32,
+    64
+  ],
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "host_note": "co-tenants hold ~2.8 GiB of the 8 GiB (TTS etc.); the KV budget is what is left",
+  "models": [
+    {
+      "model": "/home/yegor/models/gguf/qwen2.5-3b-instruct-q4_k_m.gguf",
+      "warmup_s": 2.92,
+      "levels": [
+        {
+          "concurrency": 8,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 13.345,
+          "ttft_p50_ms": 136.6,
+          "ttft_p95_ms": 158.7,
+          "itl_p50_ms": 22.48,
+          "itl_p95_ms": 22.9,
+          "decode_tps_p50": 44.5,
+          "agg_out_tps": 326.1,
+          "out_tokens_total": 4352,
+          "token_count_source": "usage",
+          "server": {
+            "num_requests_running": 8.0,
+            "num_requests_waiting": 0.0,
+            "gpu_cache_usage_perc": 0.03,
+            "num_preemptions_total": 0.0,
+            "prompt_tokens_total": 40885.0
+          }
+        },
+        {
+          "concurrency": 16,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 6.407,
+          "ttft_p50_ms": 238.4,
+          "ttft_p95_ms": 255.7,
+          "itl_p50_ms": 37.27,
+          "itl_p95_ms": 40.97,
+          "decode_tps_p50": 26.8,
+          "agg_out_tps": 359.6,
+          "out_tokens_total": 2304,
+          "token_count_source": "usage",
+          "server": {
+            "num_requests_running": 16.0,
+            "num_requests_waiting": 12.0,
+            "gpu_cache_usage_perc": 0.03,
+            "num_preemptions_total": 0.0,
+            "prompt_tokens_total": 81141.0
+          }
+        },
+        {
+          "concurrency": 32,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 13.498,
+          "ttft_p50_ms": 423.5,
+          "ttft_p95_ms": 475.3,
+          "itl_p50_ms": 72.25,
+          "itl_p95_ms": 75.13,
+          "decode_tps_p50": 13.8,
+          "agg_out_tps": 412.5,
+          "out_tokens_total": 5568,
+          "token_count_source": "usage",
+          "server": {
+            "num_requests_running": 32.0,
+            "num_requests_waiting": 20.0,
+            "gpu_cache_usage_perc": 0.04,
+            "num_preemptions_total": 0.0,
+            "prompt_tokens_total": 121397.0
+          }
+        },
+        {
+          "concurrency": 64,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 12.888,
+          "ttft_p50_ms": 514.1,
+          "ttft_p95_ms": 780.7,
+          "itl_p50_ms": 141.85,
+          "itl_p95_ms": 144.39,
+          "decode_tps_p50": 7.0,
+          "agg_out_tps": 432.0,
+          "out_tokens_total": 5568,
+          "token_count_source": "usage",
+          "server": {
+            "num_requests_running": 64.0,
+            "num_requests_waiting": 31.0,
+            "gpu_cache_usage_perc": 0.06,
+            "num_preemptions_total": 0.0,
+            "prompt_tokens_total": 161653.0
+          }
+        }
+      ]
+    }
+  ],
+  "base_url": "http://127.0.0.1:8082",
+  "vram_peak_mib": 7653,
+  "vram_note": ""
+}

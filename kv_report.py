@@ -73,12 +73,16 @@ def main() -> int:
             tps = lvl["agg_out_tps"]
             tok_h = (tps or 0) * 3600
             s = lvl.get("server", {}) or {}
+            # vLLM's gpu_cache_usage_perc is a fraction (0.13 == 13%, as its own log line states);
+            # the harness samples it, so this is the peak of ~7 samples/s, not an average.
+            kv = s.get("gpu_cache_usage_perc")
+            kv_s = f"{kv * 100:.0f}%" if kv is not None else "—"
             costs = " | ".join(
                 f"${p / tok_h * 1e6:.2f}" if tok_h else "—" for p in prices)
             lines.append(
                 f"| {lvl['concurrency']} | {tps} | {tok_h:,.0f} | {lvl['ttft_p50_ms']} ms | "
                 f"{lvl['ttft_p95_ms']} ms | {lvl['itl_p50_ms']} ms | {lvl['decode_tps_p50']} | "
-                f"{s.get('gpu_cache_usage_perc', '—')} | {s.get('num_requests_running', '—')} | "
+                f"{kv_s} | {s.get('num_requests_running', '—')} | "
                 f"{s.get('num_requests_waiting', '—')} | {s.get('num_preemptions_total', '—')} | "
                 f"{lvl['requests_failed']} | {costs} |")
         lines.append("")
@@ -87,10 +91,11 @@ def main() -> int:
                 if (lvl.get("server", {}) or {}).get("gpu_cache_usage_perc") is not None]
         if wall:
             busiest = max(wall, key=lambda l: l["server"]["gpu_cache_usage_perc"])
-            lines.append(f"Busiest level: conc {busiest['concurrency']} — GPU KV cache "
-                         f"{busiest['server']['gpu_cache_usage_perc']}% used, "
-                         f"{busiest['server'].get('num_requests_waiting')} waiting. "
-                         f"{'KV is the wall here.' if busiest['server']['gpu_cache_usage_perc'] > 80 else 'KV was not the wall here.'}")
+            usage = busiest["server"]["gpu_cache_usage_perc"] * 100
+            waiting = busiest["server"].get("num_requests_waiting")
+            lines.append(f"Busiest level: conc {busiest['concurrency']} — peak GPU KV cache "
+                         f"{usage:.0f}% used, up to {waiting} request(s) waiting. "
+                         f"{'KV is the wall here.' if usage > 80 else 'KV was not the wall here — the ceiling came from compute or from a scheduler limit, not from KV blocks.'}")
             lines.append("")
 
     md = "\n".join(lines) + "\n"

@@ -89,11 +89,13 @@ class MetricsSampler(threading.Thread):
               "num_requests_running", "num_requests_waiting", "gpu_cache_usage_perc",
               "num_preemptions_total", "prefix_cache_hit_rate")
 
-    def __init__(self, url: str, interval: float = 0.15) -> None:
+    def __init__(self, url: str, interval: float = 0.15, grace_s: float = 15.0) -> None:
         super().__init__(daemon=True)
         self.url = url
         self.interval = interval
+        self.grace_s = grace_s          # tolerate a transient failure at t0, then give up loudly
         self.available = True
+        self.error: str | None = None
         self._stop = threading.Event()
         self._max: dict[str, float] = {}
         self._last: dict[str, float] = {}
@@ -117,12 +119,20 @@ class MetricsSampler(threading.Thread):
                 self._max[short] = max(self._max.get(short, 0.0), v)
 
     def run(self) -> None:
+        t0 = time.time()
         while not self._stop.is_set():
             try:
                 self._poll()
-            except Exception:                                       # noqa: BLE001
-                self.available = False
-                return
+                self.error = None
+            except Exception as e:                                       # noqa: BLE001
+                # A first poll can lose a race with the server binding its socket. Dying on that
+                # would silently downgrade every level to "no server data" — the one failure mode
+                # this class exists to prevent. Retry inside a grace window, then fail loudly and
+                # say why, so a missing column is never mistaken for a quiet server.
+                self.error = f"{type(e).__name__}: {e}"
+                if time.time() - t0 > self.grace_s:
+                    self.available = False
+                    return
             self._stop.wait(self.interval)
 
     def reset(self) -> None:
@@ -130,8 +140,11 @@ class MetricsSampler(threading.Thread):
 
     def snapshot(self) -> dict:
         if not self.available:
-            return {"error": "metrics endpoint unavailable"}
-        return {k: round(v, 2) for k, v in self._max.items()}
+            return {"error": f"metrics endpoint unavailable ({self.error})"}
+        out: dict[str, float | str] = {k: round(v, 2) for k, v in self._max.items()}
+        if self.error:
+            out["_sampler_note"] = f"transient poll errors: {self.error}"
+        return out
 
     def stop(self) -> None:
         self._stop.set()

@@ -11,7 +11,7 @@ GPU    NVIDIA GeForce RTX 3060 Ti (8 GB, sm_86), driver 610.57.04
 Server ollama 0.32.15 (llama.cpp backend), OpenAI-compatible /v1/chat/completions
 Models qwen2.5:3b (Q4_K_M, 1.93 GB) · qwen2.5:7b (Q4_K_M, 4.68 GB)
 Client Python + aiohttp, streaming SSE, temperature 0
-Co-tenants  two local TTS services hold ~2.8 GB of VRAM for the whole run (see "environment")
+Co-tenants  two local TTS services hold 2.8–3.9 GB of VRAM for the whole run (see "environment")
 ```
 
 ## Why this exists
@@ -98,11 +98,69 @@ The mechanism is visible in the servers' own counters (`bench.py --metrics-url`)
   consequence: every TTFT in this table is a **cache-hit** number. The cold-prefill case
   (`--prompt-mode unique`) has been measured on ollama only (≈40 ms at C=1, the cache worth ≈6 ms there)
   and belongs in the next round for vLLM.
-- The KV budget is the next wall, and it is a memory wall, not a compute one: at `--gpu-memory-utilization
-  0.45` on this shared 8 GB card, vLLM reported `Maximum concurrency for 4096 tokens per request: 1.57x`
-  — 401 GPU blocks, 0.22 GiB of KV. Short requests (≈518 tokens) fit 8 abreast at 13% cache usage;
-  full-length 4096-token requests would queue. **What a provider sells is concurrent context, and it runs
-  out before the FLOPs do.**
+- The KV budget was measured next, and the earlier assumption that it is the throughput wall **turned
+  out to be wrong** — see "The KV budget" below. It is the wall for *long* requests (the engine's
+  reported ceiling is blocks × block_size / `--max-model-len`), not for short-chat throughput.
+
+## The KV budget: 4.5× the cache, none of the throughput
+
+Two levers, same harness, same prompt, same card. All rows: vLLM 0.8.5.post1 on GGUF (V0 engine),
+`qwen2.5:3b` Q4_K_M, 128 output tokens max, output tokens only. Manifests in `results/kv-sweep*.json`,
+raw per-run JSON next to them; `kv_sweep.py` runs them, `kv_report.py` / `kv_compare.py` render them.
+
+**Lever 1 — `--max-model-len` at a fixed memory budget (`--gpu-memory-utilization 0.45`):**
+
+| max-model-len | CUDA KV blocks | KV budget | engine's concurrency ceiling | agg tok/s C=8 | C=16 | C=32 | $/1M @ $0.20/h (C=32) |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1024 | 415 | 0.23 GiB | **6.48×** | 325.7 | 364.3 | 427.1 | $0.130 |
+| 2048 | 415 | 0.23 GiB | **3.24×** | 328.9 | 364.0 | 426.3 | $0.130 |
+| 4096 | 401 | 0.22 GiB | **1.57×** | 327.3 | 362.4 | 426.7 | $0.130 |
+
+The reported ceiling moves by 4×; throughput does not move at all. That ceiling is the engine's worst
+case — `blocks × block_size / max_model_len` — and these requests are ~830 tokens long, so the worst case
+never binds. It caps the longest *admissible* request, not the throughput of short ones. (The one
+side effect: at 1024/2048 with 32 requests in flight, `num_requests_waiting` rose to 8–12 while it stayed
+0 at 4096 — consistent with a smaller token budget per scheduler step, not with KV exhaustion.)
+
+**Lever 2 — the KV budget itself** (`--gpu-memory-utilization` 0.45 → 0.55), max-model-len 4096:
+
+| KV budget | blocks | ceiling (4096 tok/req) | agg tok/s C=8 | C=32 | C=64 | KV used (peak) | max waiting |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.22 GiB | 401 | 1.57× | 326.4 | 417.1 | 440.3 | — (endpoint silent that run) | — |
+| 0.99 GiB | 1795 | **7.01×** | 307.3 | 420.7 | 408.3 | **6%** | 28 |
+| 0.99 GiB, max-model-len 1024 | 1809 | **28.27×** | 326.1 | 412.5 | 432.0 | 6% | 31 |
+
+4.5× the cache and 18× the ceiling buy **no throughput** (differences are inside the ±8% run-to-run
+scatter at C=64). Even with 0.99 GiB of KV the scheduler queues at C≥16 — up to 28 requests waiting —
+while the cache sits at 3–6% used and preemptions stay at 0. So **the wall is compute, not memory**: at
+C=64 the batch decodes ~7 steps/s, i.e. a few GB/s of weight traffic on a card with 448 GB/s. That is the
+dequant-and-matmul bottleneck the kernel lab measured from the other side, where a fused W4A16 GEMM
+landed 12% *behind* plain fp16 cuBLAS on the same GPU.
+
+**Where concurrency stops paying.** C=32 → C=64 nearly doubles p95 TTFT (469 → 811 ms) and buys nothing
+(420.7 → 408.3 tok/s). On this box the SLO frontier ends at **C=32**; anything past it is latency
+purchased with a rounding error.
+
+### Margin, not just cost
+
+`margin_model.py` turns measured throughput into the provider's unit of account, with the price/latency
+bar taken from **outside** — `market_prices.json`, collected from public provider pages (source URLs in
+the file):
+
+| market, output price | our $/1M @ $0.20/h (C=32) | margin | break-even level |
+|---|---:|---:|---|
+| deepseek-v4-flash $0.28 | $0.130 | +$0.150 (2.2×) | C=4 |
+| glm-5.3-flash $0.46 (cheapest EU endpoint) | $0.130 | +$0.330 (3.5×) | C≈2–4 |
+| glm-5.3-flash $0.50 (Z.AI / Together) | $0.130 | +$0.370 (3.8×) | C=2 |
+
+The same file carries the providers' own measured tails — 409–697 ms TTFT, 77–129 tok/s per stream — as
+the bar our p95 has to clear: C=32 (415–469 ms) clears it, C=64 (787–811 ms) does not.
+
+Caveats, because they are large: output tokens only (prefill is not in this measurement set); our model is
+a 3B Q4 on one 8 GB consumer card, so what transfers is the *arithmetic* of margin, not a claim about
+serving GLM or DeepSeek-V4-Flash; and the card is shared with TTS co-tenants holding **3.9 GiB**, which is
+what caps `--gpu-memory-utilization` at 0.55 in the first place. The KV budget, not the card, is the
+honest limit of this experiment.
 
 The conclusion for anyone paying for GPUs: **before optimising a kernel, count the slots and size the KV
 cache.** The gap here (2.4× per token, 28× on the tail) is larger than anything a weight-decode kernel
@@ -151,9 +209,9 @@ measurement is deliberately deferred, see below.
 
 ## What this is not
 
-- **Not yet a vLLM / SGLang comparison.** vLLM 0.8.5.post1 is now installed alongside (CUDA verified)
-  and the same harness points at it; the tables above are ollama vs `llama-server`. The interesting
-  question — how far a PagedAttention engine gets past `busy_slots_per_decode ≈ 2` — is still open.
+- **Not yet a vLLM / SGLang comparison.** vLLM 0.8.5.post1 is installed alongside (CUDA verified) and the
+  same harness points at it — see "The KV budget" for what it measured. The engine-vs-engine table above
+  is still ollama vs `llama-server`; SGLang is untouched.
 - **Not a claim that configuration beats kernels always.** It beats kernels *here*, on this card, for
   this workload. The point is the ordering of effort: measure the serving config before rewriting the
   math.
@@ -165,11 +223,15 @@ measurement is deliberately deferred, see below.
 
 ## Deferred on purpose
 
-1. **Clean 7B with the GPU to itself.** Two voice services hold ~2.8 GB; stopping them is the
+1. **Clean 7B with the GPU to itself.** Two voice services hold ~3.9 GB; stopping them is the
    operator's call, not mine, so the number waits rather than the GPU getting rebooted at 22:00.
-2. **vLLM with server-side metrics** — queue depth, running vs waiting, KV-cache utilisation — to
-   turn finding 1 from "consistent with queueing" into "measured".
-3. **Context/KV-cache sweep** — same model, growing `num_ctx`, to price the context window.
+2. **A model served natively rather than through GGUF.** vLLM with GGUF drops to the V0 engine and warns
+   that GGUF quantization is "not fully optimized", which is the most likely reason throughput saturates
+   at ~420 tok/s on short requests. AWQ / GPTQ / fp16 safetensors would test whether the ceiling moves —
+   the one remaining experiment that can distinguish "this card" from "this quant path".
+3. **Cold prefill for vLLM** (`--prompt-mode unique`): every TTFT here is a prefix-cache hit, so the
+   prefill half of an invoice is still unpriced.
+4. ~~Context/KV-cache sweep~~ — **done**, see "The KV budget": the ceiling moves, throughput does not.
 
 ## Reproduce
 
@@ -187,6 +249,32 @@ python3 bench.py --base-url http://127.0.0.1:8081 --model qwen25-3b \
 
 python3 cost_model.py --usd-per-hour 0.20,0.35,0.50   # -> cost_model.md
 ```
+
+### Reproducing the KV sweep
+
+```bash
+# vLLM is launched and stopped by the sweep itself, one config at a time (never two on one GPU):
+python3 kv_sweep.py --max-model-len 1024,2048,4096 --concurrency 1,2,4,8,16,32 --requests 32 \
+  --out results/kv-sweep.json                                   # lever 1: the context cap
+python3 kv_sweep.py --max-model-len 4096 --gpu-memory-utilization 0.45 \
+  --concurrency 8,16,32,64 --requests 64 --tag util045 \
+  --out results/kv-sweep-util045.json                           # lever 2: the KV budget
+python3 kv_sweep.py --max-model-len 4096,1024 --gpu-memory-utilization 0.55 \
+  --concurrency 8,16,32,64 --requests 64 --tag util055 \
+  --out results/kv-sweep-util055.json
+
+python3 kv_report.py  --sweep results/kv-sweep.json --usd-per-hour 0.20,0.35,0.50  # -> results/kv-sweep.md
+python3 kv_compare.py --sweeps results/kv-sweep.json results/kv-sweep-util045.json \
+  results/kv-sweep-util055.json --usd-per-hour 0.20 --md results/kv-compare.md
+python3 margin_model.py --results results/vllm-gguf-mml4096.json \
+  --market market_prices.json --usd-per-hour 0.20,0.35 --md results/margin-glm-ds.md
+```
+
+Server logs for every configuration were kept locally in `kv-logs/` (git-ignored, they run to hundreds of
+KB each) — the KV blocks, the reserved KV bytes and the concurrency ceiling in the tables are quoted from
+those logs, not recomputed from the flags; the parsed values are preserved in the `results/kv-sweep*.json`
+manifests. Each server is killed and its VRAM released before the next one starts, because a second
+resident model would change the measurement rather than repeat it.
 
 `--prompt-mode same` reuses the server's prefix cache (a real production case); `unique` puts a nonce
 in front of the prompt to force a cold prefill. Both are labelled in the output, because they are not

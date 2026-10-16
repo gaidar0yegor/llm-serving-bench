@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-10-17 00:43:16",
+  "prompt_mode": "same",
+  "prompt_chars": 2855,
+  "max_tokens": 128,
+  "requests_per_level": 64,
+  "concurrency_levels": [
+    8,
+    16,
+    32,
+    64
+  ],
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "host_note": "co-tenants hold ~2.8 GiB of the 8 GiB (TTS etc.); the KV budget is what is left",
+  "models": [
+    {
+      "model": "/home/yegor/models/gguf/qwen2.5-3b-instruct-q4_k_m.gguf",
+      "warmup_s": 13.67,
+      "levels": [
+        {
+          "concurrency": 8,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 13.334,
+          "ttft_p50_ms": 137.3,
+          "ttft_p95_ms": 146.8,
+          "itl_p50_ms": 22.49,
+          "itl_p95_ms": 23.2,
+          "decode_tps_p50": 44.5,
+          "agg_out_tps": 326.4,
+          "out_tokens_total": 4352,
+          "token_count_source": "usage",
+          "server": {
+            "error": "metrics endpoint unavailable"
+          }
+        },
+        {
+          "concurrency": 16,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 6.337,
+          "ttft_p50_ms": 233.9,
+          "ttft_p95_ms": 249.8,
+          "itl_p50_ms": 37.29,
+          "itl_p95_ms": 39.9,
+          "decode_tps_p50": 26.8,
+          "agg_out_tps": 363.6,
+          "out_tokens_total": 2304,
+          "token_count_source": "usage",
+          "server": {
+            "error": "metrics endpoint unavailable"
+          }
+        },
+        {
+          "concurrency": 32,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 13.348,
+          "ttft_p50_ms": 394.4,
+          "ttft_p95_ms": 467.7,
+          "itl_p50_ms": 72.56,
+          "itl_p95_ms": 74.29,
+          "decode_tps_p50": 13.8,
+          "agg_out_tps": 417.1,
+          "out_tokens_total": 5568,
+          "token_count_source": "usage",
+          "server": {
+            "error": "metrics endpoint unavailable"
+          }
+        },
+        {
+          "concurrency": 64,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 12.645,
+          "ttft_p50_ms": 551.5,
+          "ttft_p95_ms": 787.1,
+          "itl_p50_ms": 138.67,
+          "itl_p95_ms": 142.14,
+          "decode_tps_p50": 7.2,
+          "agg_out_tps": 440.3,
+          "out_tokens_total": 5568,
+          "token_count_source": "usage",
+          "server": {
+            "error": "metrics endpoint unavailable"
+          }
+        }
+      ]
+    }
+  ],
+  "base_url": "http://127.0.0.1:8082",
+  "vram_peak_mib": 6805,
+  "vram_note": ""
+}

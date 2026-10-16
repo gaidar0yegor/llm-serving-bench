@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-16 23:42:22",
+  "generated_at": "2026-10-16 23:45:10",
   "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
   "engine": "vLLM 0.8.5.post1, GGUF (V0 engine), single GPU, --gpu-memory-utilization 0.45",
   "prompt_mode": "same",
@@ -17,13 +17,54 @@
   "runs": [
     {
       "max_model_len": 1024,
-      "server_up": false,
-      "ready": "process exited with code 1",
+      "server_up": true,
+      "ready": "ready in 160s",
       "port": 8082,
-      "bench_ok": false,
-      "result_file": null,
+      "bench_ok": true,
+      "result_file": "results/vllm-gguf-mml1024.json",
       "log": "vllm-mml1024.log",
-      "error_tail": "v_type[0])\n                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/gguf/gguf_reader.py\", line 248, in _get_field_parts\n    curr_size, curr_parts, curr_idxs, curr_types = self._get_field_parts(offs, raw_itype[0])\n                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/gguf/gguf_reader.py\", line 230, in _get_field_parts\n    sparts: list[npt.NDArray[Any]] = list(self._get_str(offs))\n                                          ^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/gguf/gguf_reader.py\", line 218, in _get_str\n    slen = self._get(offset, np.uint64)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/gguf/gguf_reader.py\", line 204, in _get\n    return arr.view(arr.dtype.newbyteorder(self.byte_order if override_order is None else override_order))\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/numpy/_core/memmap.py\", line 310, in __array_finalize__\n    def __array_finalize__(self, obj):\n\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/vllm/entrypoints/openai/api_server.py\", line 1074, in signal_handler\n    raise KeyboardInterrupt(\"terminated\")\nKeyboardInterrupt: terminated\n"
+      "reported_max_concurrency": 6.48,
+      "reported_for_tokens": 1024,
+      "cuda_blocks": 415,
+      "kv_cache_gib": 0.23,
+      "weights_gib": 1.81,
+      "activation_peak_gib": 1.39,
+      "engine_note": "gguf quantization is not fully optimized (V0 engine)",
+      "vram_peak_mib": 5757
+    },
+    {
+      "max_model_len": 2048,
+      "server_up": true,
+      "ready": "ready in 160s",
+      "port": 8082,
+      "bench_ok": true,
+      "result_file": "results/vllm-gguf-mml2048.json",
+      "log": "vllm-mml2048.log",
+      "reported_max_concurrency": 3.24,
+      "reported_for_tokens": 2048,
+      "cuda_blocks": 415,
+      "kv_cache_gib": 0.23,
+      "weights_gib": 1.81,
+      "activation_peak_gib": 1.39,
+      "engine_note": "gguf quantization is not fully optimized (V0 engine)",
+      "vram_peak_mib": 5757
+    },
+    {
+      "max_model_len": 4096,
+      "server_up": true,
+      "ready": "ready in 166s",
+      "port": 8082,
+      "bench_ok": true,
+      "result_file": "results/vllm-gguf-mml4096.json",
+      "log": "vllm-mml4096.log",
+      "reported_max_concurrency": 1.57,
+      "reported_for_tokens": 4096,
+      "cuda_blocks": 401,
+      "kv_cache_gib": 0.22,
+      "weights_gib": 1.81,
+      "activation_peak_gib": 1.39,
+      "engine_note": "gguf quantization is not fully optimized (V0 engine)",
+      "vram_peak_mib": 5749
     }
   ]
 }

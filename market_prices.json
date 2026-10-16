@@ -1,0 +1,28 @@
+{
+  "_note": "External bar for the margin model: published prices and provider-measured tails, collected 17.10.2026 from public pages. This file is an INPUT (the market), never a measurement of ours. Prices are USD per 1M tokens.",
+  "glm-5.3-flash (cheapest EU endpoint)": {
+    "provider": "Melious (EU)",
+    "in": 0.12,
+    "out": 0.46,
+    "cache_in": 0.02,
+    "ttft_ms": 697,
+    "tps": 77,
+    "source": "https://www.requesty.ai/model/zai/glm-5.3-flash"
+  },
+  "glm-5.3-flash (official / Together)": {
+    "provider": "Z.AI official, also Together AI",
+    "in": 0.15,
+    "out": 0.5,
+    "cache_in": 0.03,
+    "ttft_ms": 409,
+    "tps": 129,
+    "source": "https://docs.z.ai/guides/overview/pricing ; https://www.requesty.ai/model/zai/glm-5.3-flash"
+  },
+  "deepseek-v4-flash (official)": {
+    "provider": "DeepSeek",
+    "in": 0.14,
+    "out": 0.28,
+    "cache_in": 0.07,
+    "source": "https://coworker.ai/blog/deepseek-api-pricing ; https://v4flash.com/pricing/"
+  }
+}

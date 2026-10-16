@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-10-17 00:45:07",
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "engine": "vLLM 0.8.5.post1, GGUF (V0 engine), single GPU, --gpu-memory-utilization 0.55",
+  "prompt_mode": "same",
+  "max_tokens": 128,
+  "requests_per_level": 64,
+  "concurrency_levels": [
+    8,
+    16,
+    32,
+    64
+  ],
+  "host_note": "co-tenants hold ~2.8 GiB of the 8 GiB (TTS etc.); the KV budget is what is left",
+  "runs": [
+    {
+      "max_model_len": 4096,
+      "server_up": true,
+      "ready": "ready in 170s",
+      "port": 8082,
+      "bench_ok": true,
+      "result_file": "results/vllm-gguf-mml4096-util055.json",
+      "log": "vllm-mml4096-util055.log",
+      "reported_max_concurrency": 7.01,
+      "reported_for_tokens": 4096,
+      "cuda_blocks": 1795,
+      "kv_cache_gib": 0.99,
+      "weights_gib": 1.81,
+      "activation_peak_gib": 1.39,
+      "engine_note": "gguf quantization is not fully optimized (V0 engine)",
+      "vram_peak_mib": 7705
+    },
+    {
+      "max_model_len": 1024,
+      "server_up": true,
+      "ready": "ready in 160s",
+      "port": 8082,
+      "bench_ok": true,
+      "result_file": "results/vllm-gguf-mml1024-util055.json",
+      "log": "vllm-mml1024-util055.log",
+      "reported_max_concurrency": 28.27,
+      "reported_for_tokens": 1024,
+      "cuda_blocks": 1809,
+      "kv_cache_gib": 0.99,
+      "weights_gib": 1.81,
+      "activation_peak_gib": 1.39,
+      "engine_note": "gguf quantization is not fully optimized (V0 engine)",
+      "vram_peak_mib": 7653
+    }
+  ]
+}
