@@ -77,3 +77,22 @@ Cheapest-to-most-expensive spread inside this run: **1.1x** (122.0 tok/s at conc
 
 Cheapest-to-most-expensive spread inside this run: **2.5x** (2.6 tok/s at conc 1 vs 6.4 tok/s at its best).
 
+## /home/yegor/models/gguf/qwen2.5-3b-instruct-q4_k_m.gguf — `vllm-gguf-np-default.json` (prompt mode: same)
+
+| conc | aggregate tok/s | tok/hour | p95 TTFT | $/1M @ 0.20 $/h | $/1M @ 0.35 $/h | $/1M @ 0.50 $/h |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 104.7 | 376,920 | 49.0 ms | $0.53 | $0.93 | $1.33 |
+| 2 | 119.8 | 431,280 | 73.4 ms | $0.46 | $0.81 | $1.16 |
+| 4 | 226.7 | 816,120 | 92.7 ms | $0.25 | $0.43 | $0.61 |
+| 8 | 324.2 | 1,167,120 | 145.7 ms | $0.17 | $0.30 | $0.43 |
+
+**Cheapest level that still meets the latency budget** (p95 TTFT):
+
+| p95 budget | max concurrency | tok/s there | $/1M @ 0.20 | $/1M @ 0.35 | $/1M @ 0.50 |
+|---:|---:|---:|---:|---:|---:|
+| 250 ms | 8 | 324.2 | $0.17 | $0.30 | $0.43 |
+| 500 ms | 8 | 324.2 | $0.17 | $0.30 | $0.43 |
+| 2000 ms | 8 | 324.2 | $0.17 | $0.30 | $0.43 |
+
+Cheapest-to-most-expensive spread inside this run: **3.1x** (104.7 tok/s at conc 1 vs 324.2 tok/s at its best).
+

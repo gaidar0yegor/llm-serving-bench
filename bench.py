@@ -84,7 +84,10 @@ class MetricsSampler(threading.Thread):
     """
 
     SERIES = ("requests_processing", "requests_deferred", "n_busy_slots_per_decode",
-              "prompt_tokens_cached_total", "prompt_tokens_total")
+              "prompt_tokens_cached_total", "prompt_tokens_total",
+              # vLLM (Prometheus) uses different names for the same ideas
+              "num_requests_running", "num_requests_waiting", "gpu_cache_usage_perc",
+              "num_preemptions_total", "prefix_cache_hit_rate")
 
     def __init__(self, url: str, interval: float = 0.15) -> None:
         super().__init__(daemon=True)
@@ -103,7 +106,8 @@ class MetricsSampler(threading.Thread):
             if line.startswith("#") or not line.strip():
                 continue
             name, _, value = line.rpartition(" ")
-            short = name.split(":")[-1]
+            # series may carry labels: vllm:num_requests_running{model_name="..."} 0.0
+            short = name.split(":")[-1].split("{")[0]
             if short in self.SERIES:
                 try:
                     v = float(value)

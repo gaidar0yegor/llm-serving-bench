@@ -53,52 +53,65 @@ co-tenant TTS services.
 
 ## Where the compute actually was: the server, not the silicon
 
-Same box, same model (`qwen2.5:3b`, Q4_K_M), same prompts, same GPU price. The only thing that
-changed is how many slots the server was configured with:
+Same box, same model (`qwen2.5:3b`, Q4_K_M), same prompts, same GPU price. The only things that
+changed are the serving engine and how it was configured:
 
 | engine / config | agg tok/s at C=1 | agg tok/s at C=8 | gain from 8× concurrency | TTFT p95 at C=8 | $/1M @ $0.20/h at C=8 |
 |---|---:|---:|---:|---:|---:|
 | ollama 0.32.15 (as shipped) | 125.0 | 135.9 | **+9%** | 4 150 ms | $0.41 |
-| llama-server 0.1.2-dev, `-np 8 -cb` | 121.0 | 253.7 | **+110%** | **206.8 ms** | **$0.22** |
+| llama-server 0.1.2-dev, `-np 8 -cb` | 121.0 | 253.7 | **+110%** | 206.8 ms | $0.22 |
+| **vLLM 0.8.5.post1, GGUF (V0 engine)** | 104.7 | **324.2** | **+210%** | **145.7 ms** | **$0.17** |
 
-**2.1× cheaper per output token and 20× better tail latency — from configuration alone.** No kernel
-change, no quantization change, no new hardware.
+**2.4× cheaper per output token than the same box running its default server, and 28× better tail
+latency — from configuration alone.** No kernel change, no quantization change, no new hardware.
 
-The mechanism is visible in the server's own counters (collected by `bench.py --metrics-url`):
+Caveats that belong next to the number: vLLM served here through its GGUF path, which falls back to
+the **V0 engine** (V1 does not accept GGUF yet), and vLLM itself warns that GGUF quantization is "not
+fully optimized yet". A safetensors or AWQ model would very likely beat 324 tok/s. This is the floor
+for that engine, not its ceiling.
 
-| conc | processing | deferred | busy slots/decode | decode tok/s per request | ITL p50 | ITL p95 |
+The mechanism is visible in the servers' own counters (`bench.py --metrics-url`):
+
+**llama.cpp (`-np 8`)** — slot-level counters:
+
+| conc | processing | deferred | busy slots/decode | decode tok/s per request | ITL p50 |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 1 | 0 | 1.00 | 132.9 | 7.61 ms |
+| 8 | 8 | 0 | 1.98 | 39.5 | 25.64 ms |
+
+**vLLM (`/metrics`)** — engine-level counters:
+
+| conc | num_requests_running | num_requests_waiting | gpu_cache_usage_perc | num_preemptions | decode tok/s per request | ITL p50 |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1 | 1 | 0 | 1.00 | 132.9 | 7.61 ms | 8.31 ms |
-| 2 | 2 | 0 | 1.27 | 113.5 | 9.24 ms | 12.13 ms |
-| 4 | 4 | 0 | 1.61 | 73.8 | 14.45 ms | 16.73 ms |
-| 8 | 8 | 0 | 1.98 | 39.5 | 25.64 ms | 25.69 ms |
+| 1 | 1 | 0 | 0.10 | 0 | 119.3 | 8.40 ms |
+| 8 | 8 | 0 | 0.13 | 0 | 44.5 | 22.48 ms |
 
-- **`requests_deferred` never leaves zero.** Nothing was ever queued. The 2.4-second TTFT measured on
-  the first engine was **slot starvation**, not saturation — a single-slot server serialises work that
-  the hardware could have batched.
-- **`n_busy_slots_per_decode` climbs to ~2**, not 8: batching is real but partial, so even this
-  configuration is not at its own ceiling.
-- **The cost of batching moved to inter-token latency** (7.6 → 25.6 ms) while TTFT stayed bounded at
-  ~207 ms. That is the healthy trade — aggregate up, tail controlled — and the opposite of what the
-  single-slot engine did.
+- **`requests_deferred` / `num_requests_waiting` never leave zero** on either engine. Nothing was ever
+  queued. The 2.4-second TTFT measured on the first engine was **slot starvation**, not saturation — a
+  single-slot server serialises work the hardware could have batched.
+- **vLLM genuinely overlaps 8 requests** (`num_requests_running` = 8, zero preemptions) and pays for it
+  in per-request decode speed (119.3 → 44.5 tok/s) while aggregate triples. That is continuous batching,
+  measured rather than asserted.
+- The KV budget is the next wall, and it is a memory wall, not a compute one: at `--gpu-memory-utilization
+  0.45` on this shared 8 GB card, vLLM reported `Maximum concurrency for 4096 tokens per request: 1.57x`
+  — 401 GPU blocks, 0.22 GiB of KV. Short requests (≈518 tokens) fit 8 abreast at 13% cache usage;
+  full-length 4096-token requests would queue. **What a provider sells is concurrent context, and it runs
+  out before the FLOPs do.**
 
-The conclusion for anyone paying for GPUs: **before optimising a kernel, count the slots.** The gap
-here (2.1× per token, 20× on the tail) is larger than anything a weight-decode kernel could deliver on
-this device — our own fused W4A16 attempt landed 12% *behind* plain fp16 cuBLAS.
-
-A prerequisite worth stating: this measurement needs a server that publishes its own state. ollama
-does not, which is exactly why the first round of this benchmark could only say "consistent with
-queueing". `llama-server`'s `/metrics` turned that into "measured": queue depth zero, batch width two.
+The conclusion for anyone paying for GPUs: **before optimising a kernel, count the slots and size the KV
+cache.** The gap here (2.4× per token, 28× on the tail) is larger than anything a weight-decode kernel
+could deliver on this device — our own fused W4A16 attempt landed 12% *behind* plain fp16 cuBLAS.
 
 ### Cost model
 
 `cost_model.py` turns any result file into $/1M output tokens at a given GPU price, plus the cheapest
 concurrency level that still meets a latency budget:
 
-| conc | aggregate tok/s | tok/hour | p95 TTFT | $/1M @ $0.20/h | $/1M @ $0.35/h |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 121.0 | 435 600 | 74.8 ms | $0.46 | $0.80 |
-| 8 | 253.7 | 913 320 | 206.8 ms | **$0.22** | $0.38 |
+| engine, conc | aggregate tok/s | tok/hour | p95 TTFT | $/1M @ $0.20/h | $/1M @ $0.35/h |
+|---|---:|---:|---:|---:|---:|
+| llama.cpp, 8 | 253.7 | 913 320 | 206.8 ms | $0.22 | $0.38 |
+| vLLM, 8 | 324.2 | 1 167 120 | 145.7 ms | **$0.17** | $0.30 |
+| vLLM, 1 | 104.7 | 376 920 | 49.0 ms | $0.53 | $0.93 |
 
 Price is a parameter, not a claim about anyone's invoice; output tokens only, 100% duty cycle, one
 model resident. A real bill also charges prefill, which this measurement set does not contain.

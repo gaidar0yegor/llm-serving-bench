@@ -282,6 +282,87 @@
         }
       },
       "penalty_vs_best": 2.5
+    },
+    {
+      "result_file": "vllm-gguf-np-default.json",
+      "model": "/home/yegor/models/gguf/qwen2.5-3b-instruct-q4_k_m.gguf",
+      "prompt_mode": "same",
+      "levels": [
+        {
+          "concurrency": 1,
+          "agg_out_tps": 104.7,
+          "tok_per_hour": 376920.0,
+          "ttft_p95_ms": 49.0,
+          "usd_per_1m": {
+            "0.20": 0.53,
+            "0.35": 0.93,
+            "0.50": 1.33
+          }
+        },
+        {
+          "concurrency": 2,
+          "agg_out_tps": 119.8,
+          "tok_per_hour": 431280.0,
+          "ttft_p95_ms": 73.4,
+          "usd_per_1m": {
+            "0.20": 0.46,
+            "0.35": 0.81,
+            "0.50": 1.16
+          }
+        },
+        {
+          "concurrency": 4,
+          "agg_out_tps": 226.7,
+          "tok_per_hour": 816120.0,
+          "ttft_p95_ms": 92.7,
+          "usd_per_1m": {
+            "0.20": 0.25,
+            "0.35": 0.43,
+            "0.50": 0.61
+          }
+        },
+        {
+          "concurrency": 8,
+          "agg_out_tps": 324.2,
+          "tok_per_hour": 1167120.0,
+          "ttft_p95_ms": 145.7,
+          "usd_per_1m": {
+            "0.20": 0.17,
+            "0.35": 0.3,
+            "0.50": 0.43
+          }
+        }
+      ],
+      "slo_best": {
+        "250ms": {
+          "concurrency": 8,
+          "agg_out_tps": 324.2,
+          "usd_per_1m": {
+            "0.20": 0.17,
+            "0.35": 0.3,
+            "0.50": 0.43
+          }
+        },
+        "500ms": {
+          "concurrency": 8,
+          "agg_out_tps": 324.2,
+          "usd_per_1m": {
+            "0.20": 0.17,
+            "0.35": 0.3,
+            "0.50": 0.43
+          }
+        },
+        "2000ms": {
+          "concurrency": 8,
+          "agg_out_tps": 324.2,
+          "usd_per_1m": {
+            "0.20": 0.17,
+            "0.35": 0.3,
+            "0.50": 0.43
+          }
+        }
+      },
+      "penalty_vs_best": 3.1
     }
   ]
 }
