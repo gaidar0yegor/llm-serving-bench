@@ -1,0 +1,206 @@
+{
+  "usd_per_hour": [
+    0.2,
+    0.35,
+    0.5
+  ],
+  "slo_budgets_ms": [
+    250,
+    500,
+    2000
+  ],
+  "runs": [
+    {
+      "result_file": "qwen25-3b_same.json",
+      "model": "qwen2.5:3b",
+      "prompt_mode": "same",
+      "levels": [
+        {
+          "concurrency": 1,
+          "agg_out_tps": 125.0,
+          "tok_per_hour": 450000.0,
+          "ttft_p95_ms": 40.4,
+          "usd_per_1m": {
+            "0.20": 0.44,
+            "0.35": 0.78,
+            "0.50": 1.11
+          }
+        },
+        {
+          "concurrency": 2,
+          "agg_out_tps": 132.4,
+          "tok_per_hour": 476640.0,
+          "ttft_p95_ms": 682.2,
+          "usd_per_1m": {
+            "0.20": 0.42,
+            "0.35": 0.73,
+            "0.50": 1.05
+          }
+        },
+        {
+          "concurrency": 4,
+          "agg_out_tps": 135.7,
+          "tok_per_hour": 488519.99999999994,
+          "ttft_p95_ms": 1801.4,
+          "usd_per_1m": {
+            "0.20": 0.41,
+            "0.35": 0.72,
+            "0.50": 1.02
+          }
+        },
+        {
+          "concurrency": 8,
+          "agg_out_tps": 135.9,
+          "tok_per_hour": 489240.0,
+          "ttft_p95_ms": 4149.9,
+          "usd_per_1m": {
+            "0.20": 0.41,
+            "0.35": 0.72,
+            "0.50": 1.02
+          }
+        }
+      ],
+      "slo_best": {
+        "250ms": {
+          "concurrency": 1,
+          "agg_out_tps": 125.0,
+          "usd_per_1m": {
+            "0.20": 0.44,
+            "0.35": 0.78,
+            "0.50": 1.11
+          }
+        },
+        "500ms": {
+          "concurrency": 1,
+          "agg_out_tps": 125.0,
+          "usd_per_1m": {
+            "0.20": 0.44,
+            "0.35": 0.78,
+            "0.50": 1.11
+          }
+        },
+        "2000ms": {
+          "concurrency": 4,
+          "agg_out_tps": 135.7,
+          "usd_per_1m": {
+            "0.20": 0.41,
+            "0.35": 0.72,
+            "0.50": 1.02
+          }
+        }
+      },
+      "penalty_vs_best": 1.1
+    },
+    {
+      "result_file": "qwen25-3b_unique.json",
+      "model": "qwen2.5:3b",
+      "prompt_mode": "unique",
+      "levels": [
+        {
+          "concurrency": 1,
+          "agg_out_tps": 122.0,
+          "tok_per_hour": 439200.0,
+          "ttft_p95_ms": 140.3,
+          "usd_per_1m": {
+            "0.20": 0.46,
+            "0.35": 0.8,
+            "0.50": 1.14
+          }
+        },
+        {
+          "concurrency": 4,
+          "agg_out_tps": 131.0,
+          "tok_per_hour": 471600.0,
+          "ttft_p95_ms": 1728.9,
+          "usd_per_1m": {
+            "0.20": 0.42,
+            "0.35": 0.74,
+            "0.50": 1.06
+          }
+        }
+      ],
+      "slo_best": {
+        "250ms": {
+          "concurrency": 1,
+          "agg_out_tps": 122.0,
+          "usd_per_1m": {
+            "0.20": 0.46,
+            "0.35": 0.8,
+            "0.50": 1.14
+          }
+        },
+        "500ms": {
+          "concurrency": 1,
+          "agg_out_tps": 122.0,
+          "usd_per_1m": {
+            "0.20": 0.46,
+            "0.35": 0.8,
+            "0.50": 1.14
+          }
+        },
+        "2000ms": {
+          "concurrency": 4,
+          "agg_out_tps": 131.0,
+          "usd_per_1m": {
+            "0.20": 0.42,
+            "0.35": 0.74,
+            "0.50": 1.06
+          }
+        }
+      },
+      "penalty_vs_best": 1.1
+    },
+    {
+      "result_file": "qwen25-7b_same.json",
+      "model": "qwen2.5:7b",
+      "prompt_mode": "same",
+      "levels": [
+        {
+          "concurrency": 1,
+          "agg_out_tps": 2.6,
+          "tok_per_hour": 9360.0,
+          "ttft_p95_ms": 1175.9,
+          "usd_per_1m": {
+            "0.20": 21.37,
+            "0.35": 37.39,
+            "0.50": 53.42
+          }
+        },
+        {
+          "concurrency": 2,
+          "agg_out_tps": 6.4,
+          "tok_per_hour": 23040.0,
+          "ttft_p95_ms": 12605.8,
+          "usd_per_1m": {
+            "0.20": 8.68,
+            "0.35": 15.19,
+            "0.50": 21.7
+          }
+        },
+        {
+          "concurrency": 4,
+          "agg_out_tps": 2.7,
+          "tok_per_hour": 9720.0,
+          "ttft_p95_ms": 60759.6,
+          "usd_per_1m": {
+            "0.20": 20.58,
+            "0.35": 36.01,
+            "0.50": 51.44
+          }
+        }
+      ],
+      "slo_best": {
+        "2000ms": {
+          "concurrency": 1,
+          "agg_out_tps": 2.6,
+          "usd_per_1m": {
+            "0.20": 21.37,
+            "0.35": 37.39,
+            "0.50": 53.42
+          }
+        }
+      },
+      "penalty_vs_best": 2.5
+    }
+  ]
+}
