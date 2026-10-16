@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-10-16 22:05:39",
+  "prompt_mode": "same",
+  "prompt_chars": 2855,
+  "max_tokens": 128,
+  "requests_per_level": 6,
+  "concurrency_levels": [
+    1,
+    2,
+    4
+  ],
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "host_note": "",
+  "models": [
+    {
+      "model": "qwen2.5:7b",
+      "warmup_s": 19.82,
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests_ok": 6,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 126.696,
+          "ttft_p50_ms": 268.0,
+          "ttft_p95_ms": 1175.9,
+          "itl_p50_ms": 177.83,
+          "itl_p95_ms": 795.94,
+          "decode_tps_p50": 3.8,
+          "agg_out_tps": 2.6,
+          "out_tokens_total": 330,
+          "token_count_source": "usage"
+        },
+        {
+          "concurrency": 2,
+          "requests_ok": 6,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 51.607,
+          "ttft_p50_ms": 1456.5,
+          "ttft_p95_ms": 12605.8,
+          "itl_p50_ms": 118.81,
+          "itl_p95_ms": 218.94,
+          "decode_tps_p50": 7.6,
+          "agg_out_tps": 6.4,
+          "out_tokens_total": 330,
+          "token_count_source": "usage"
+        },
+        {
+          "concurrency": 4,
+          "requests_ok": 6,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 120.392,
+          "ttft_p50_ms": 6429.6,
+          "ttft_p95_ms": 60759.6,
+          "itl_p50_ms": 122.23,
+          "itl_p95_ms": 843.0,
+          "decode_tps_p50": 7.9,
+          "agg_out_tps": 2.7,
+          "out_tokens_total": 330,
+          "token_count_source": "usage"
+        }
+      ]
+    }
+  ],
+  "base_url": "http://127.0.0.1:11434",
+  "ollama_version": "0.32.15",
+  "vram_peak_mib": 6719,
+  "vram_note": ""
+}
