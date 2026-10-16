@@ -58,9 +58,13 @@ queue is.** Removing the prefix cache changed TTFT at C=1 by ~6 ms.
 
 | conc | ttft p50 | ttft p95 | itl p50 | itl p95 | decode tok/s p50 | agg tok/s | out tokens |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 268.0 ms | 1 175.9 ms | 177.83 ms | — | 3.8 | 2.6 | 768 |
-| 2 | 1 456.5 ms | 12 605.8 ms | 118.81 ms | — | 7.6 | 6.4 | 768 |
-| 4 | 6 429.6 ms | 60 759.6 ms | 122.23 ms | — | 7.9 | 2.7 | 768 |
+| 1 | 268.0 ms | 1 175.9 ms | 177.83 ms | 795.94 ms | 3.8 | 2.6 | 768 |
+| 2 | 1 456.5 ms | 12 605.8 ms | 118.81 ms | 218.94 ms | 7.6 | 6.4 | 768 |
+| 4 | 6 429.6 ms | 60 759.6 ms | 122.23 ms | 843.00 ms | 7.9 | 2.7 | 768 |
+
+The tail of inter-token latency blows up too, not just TTFT: p95 ITL reaches 796 ms at C=1 and 843 ms at
+C=4, against 7-8 ms p95 for the config that fits. When part of the model sits on the CPU, *every* token
+pays for it — the damage is not confined to the first one.
 
 ## Reading notes
 
