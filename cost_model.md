@@ -4,6 +4,25 @@ Throughput is what `bench.py` measured; price is a parameter. 100% duty cycle as
 one model resident, output tokens only. The p95 TTFT column is what that throughput cost
 in queueing.
 
+## qwen25-3b — `llamaserver-np8-gpu.json` (prompt mode: same)
+
+| conc | aggregate tok/s | tok/hour | p95 TTFT | $/1M @ 0.20 $/h | $/1M @ 0.35 $/h | $/1M @ 0.50 $/h |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 121.0 | 435,600 | 74.8 ms | $0.46 | $0.80 | $1.15 |
+| 2 | 180.7 | 650,520 | 207.1 ms | $0.31 | $0.54 | $0.77 |
+| 4 | 222.7 | 801,720 | 254.3 ms | $0.25 | $0.44 | $0.62 |
+| 8 | 253.7 | 913,320 | 206.8 ms | $0.22 | $0.38 | $0.55 |
+
+**Cheapest level that still meets the latency budget** (p95 TTFT):
+
+| p95 budget | max concurrency | tok/s there | $/1M @ 0.20 | $/1M @ 0.35 | $/1M @ 0.50 |
+|---:|---:|---:|---:|---:|---:|
+| 250 ms | 8 | 253.7 | $0.22 | $0.38 | $0.55 |
+| 500 ms | 8 | 253.7 | $0.22 | $0.38 | $0.55 |
+| 2000 ms | 8 | 253.7 | $0.22 | $0.38 | $0.55 |
+
+Cheapest-to-most-expensive spread inside this run: **2.1x** (121.0 tok/s at conc 1 vs 253.7 tok/s at its best).
+
 ## qwen2.5:3b — `qwen25-3b_same.json` (prompt mode: same)
 
 | conc | aggregate tok/s | tok/hour | p95 TTFT | $/1M @ 0.20 $/h | $/1M @ 0.35 $/h | $/1M @ 0.50 $/h |

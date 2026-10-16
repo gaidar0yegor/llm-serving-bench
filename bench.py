@@ -74,6 +74,66 @@ class VramSampler(threading.Thread):
         self.join(timeout=2)
 
 
+class MetricsSampler(threading.Thread):
+    """Poll a Prometheus endpoint so a level can be annotated with what the *server* was doing.
+
+    Client-side latency says a request waited; only the server can say whether it waited behind a
+    full queue or behind a single decode slot. `requests_deferred` (queue) and
+    `n_busy_slots_per_decode` (sequences actually batched into one decode step) are the two series
+    that separate those cases — they are the reason this exists.
+    """
+
+    SERIES = ("requests_processing", "requests_deferred", "n_busy_slots_per_decode",
+              "prompt_tokens_cached_total", "prompt_tokens_total")
+
+    def __init__(self, url: str, interval: float = 0.15) -> None:
+        super().__init__(daemon=True)
+        self.url = url
+        self.interval = interval
+        self.available = True
+        self._stop = threading.Event()
+        self._max: dict[str, float] = {}
+        self._last: dict[str, float] = {}
+
+    def _poll(self) -> None:
+        import urllib.request
+        with urllib.request.urlopen(self.url, timeout=3) as r:      # noqa: S310 - local endpoint
+            text = r.read().decode("utf-8", "ignore")
+        for line in text.splitlines():
+            if line.startswith("#") or not line.strip():
+                continue
+            name, _, value = line.rpartition(" ")
+            short = name.split(":")[-1]
+            if short in self.SERIES:
+                try:
+                    v = float(value)
+                except ValueError:
+                    continue
+                self._last[short] = v
+                self._max[short] = max(self._max.get(short, 0.0), v)
+
+    def run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                self._poll()
+            except Exception:                                       # noqa: BLE001
+                self.available = False
+                return
+            self._stop.wait(self.interval)
+
+    def reset(self) -> None:
+        self._max = {}
+
+    def snapshot(self) -> dict:
+        if not self.available:
+            return {"error": "metrics endpoint unavailable"}
+        return {k: round(v, 2) for k, v in self._max.items()}
+
+    def stop(self) -> None:
+        self._stop.set()
+        self.join(timeout=2)
+
+
 # ---------------------------------------------------------------- one request
 
 async def one_request(session, url, model, prompt, max_tokens, timeout):
@@ -226,6 +286,10 @@ async def main_async(args):
     concurrency = [int(c) for c in args.concurrency.split(",")]
     sampler = VramSampler()
     sampler.start()
+    msampler = None
+    if args.metrics_url:
+        msampler = MetricsSampler(args.metrics_url)
+        msampler.start()
     report = {
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "prompt_mode": args.prompt_mode,
@@ -251,17 +315,29 @@ async def main_async(args):
             levels = []
             for c in concurrency:
                 print(f"  concurrency {c} ...", flush=True)
+                if msampler is not None:
+                    msampler.reset()
                 res, wall = await run_level(session, args, model, prompt, c, args.requests, sampler)
                 row = summarize(res, wall, c)
+                if msampler is not None:
+                    row["server"] = msampler.snapshot()
                 levels.append(row)
+                extra = ""
+                if msampler is not None and "error" not in row["server"]:
+                    s = row["server"]
+                    extra = (f" | server: processing<={s.get('requests_processing')} "
+                             f"deferred<={s.get('requests_deferred')} "
+                             f"busy_slots<={s.get('n_busy_slots_per_decode')}")
                 print(f"    ttft p50 {row['ttft_p50_ms']} ms | itl p50 {row['itl_p50_ms']} ms | "
-                      f"agg {row['agg_out_tps']} tok/s | fail {row['requests_failed']}", flush=True)
+                      f"agg {row['agg_out_tps']} tok/s | fail {row['requests_failed']}{extra}", flush=True)
             report["models"].append({
                 "model": model,
                 "warmup_s": round(warm_s, 2),
                 "levels": levels,
             })
     sampler.stop()
+    if msampler is not None:
+        msampler.stop()
     report["vram_peak_mib"] = sampler.peak_mib if sampler.available else None
     report["vram_note"] = args.vram_note
     print(f"\npeak VRAM during run: {report['vram_peak_mib']} MiB")
@@ -279,13 +355,23 @@ def to_markdown(rep):
     lines = []
     for m in rep["models"]:
         lines.append(f"\n**{m['model']}** (warmup {m['warmup_s']} s)\n")
-        lines.append("| conc | ttft p50 | ttft p95 | itl p50 | itl p95 | decode tok/s | aggregate tok/s | failed |")
-        lines.append("|---:|---:|---:|---:|---:|---:|---:|---:|")
+        has_server = any("server" in r and "error" not in r.get("server", {}) for r in m["levels"])
+        head = "| conc | ttft p50 | ttft p95 | itl p50 | itl p95 | decode tok/s | aggregate tok/s | failed |"
+        sep = "|---:|---:|---:|---:|---:|---:|---:|---:|"
+        if has_server:
+            head += " processing | deferred | busy slots/decode |"
+            sep += "---:|---:|---:|"
+        lines.append(head)
+        lines.append(sep)
         for r in m["levels"]:
-            lines.append(
-                f"| {r['concurrency']} | {r['ttft_p50_ms']} ms | {r['ttft_p95_ms']} ms | "
-                f"{r['itl_p50_ms']} ms | {r['itl_p95_ms']} ms | {r['decode_tps_p50']} | "
-                f"{r['agg_out_tps']} | {r['requests_failed']} |")
+            line = (f"| {r['concurrency']} | {r['ttft_p50_ms']} ms | {r['ttft_p95_ms']} ms | "
+                    f"{r['itl_p50_ms']} ms | {r['itl_p95_ms']} ms | {r['decode_tps_p50']} | "
+                    f"{r['agg_out_tps']} | {r['requests_failed']} |")
+            if has_server:
+                s = r.get("server", {})
+                line += (f" {s.get('requests_processing','—')} | {s.get('requests_deferred','—')} | "
+                         f"{s.get('n_busy_slots_per_decode','—')} |")
+            lines.append(line)
     return "\n".join(lines)
 
 
@@ -299,6 +385,9 @@ def main():
     ap.add_argument("--prompt-mode", choices=["same", "unique"], default="same")
     ap.add_argument("--timeout", type=float, default=300)
     ap.add_argument("--json", default="results.json")
+    ap.add_argument("--metrics-url", default=None,
+                    help="Prometheus endpoint (e.g. http://127.0.0.1:8081/metrics) to annotate each "
+                         "level with server-side queue and batching state")
     ap.add_argument("--host-note", default="")
     ap.add_argument("--vram-note", default="")
     args = ap.parse_args()

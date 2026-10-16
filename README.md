@@ -51,6 +51,58 @@ Cold prefill (unique prompt per request, prefix cache defeated):
 Peak VRAM during runs: 5 071 MiB (3B) / 6 719 MiB (7B) — both figures *include* ~2.8 GB held by the
 co-tenant TTS services.
 
+## Where the compute actually was: the server, not the silicon
+
+Same box, same model (`qwen2.5:3b`, Q4_K_M), same prompts, same GPU price. The only thing that
+changed is how many slots the server was configured with:
+
+| engine / config | agg tok/s at C=1 | agg tok/s at C=8 | gain from 8× concurrency | TTFT p95 at C=8 | $/1M @ $0.20/h at C=8 |
+|---|---:|---:|---:|---:|---:|
+| ollama 0.32.15 (as shipped) | 125.0 | 135.9 | **+9%** | 4 150 ms | $0.41 |
+| llama-server 0.1.2-dev, `-np 8 -cb` | 121.0 | 253.7 | **+110%** | **206.8 ms** | **$0.22** |
+
+**2.1× cheaper per output token and 20× better tail latency — from configuration alone.** No kernel
+change, no quantization change, no new hardware.
+
+The mechanism is visible in the server's own counters (collected by `bench.py --metrics-url`):
+
+| conc | processing | deferred | busy slots/decode | decode tok/s per request | ITL p50 | ITL p95 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 1 | 0 | 1.00 | 132.9 | 7.61 ms | 8.31 ms |
+| 2 | 2 | 0 | 1.27 | 113.5 | 9.24 ms | 12.13 ms |
+| 4 | 4 | 0 | 1.61 | 73.8 | 14.45 ms | 16.73 ms |
+| 8 | 8 | 0 | 1.98 | 39.5 | 25.64 ms | 25.69 ms |
+
+- **`requests_deferred` never leaves zero.** Nothing was ever queued. The 2.4-second TTFT measured on
+  the first engine was **slot starvation**, not saturation — a single-slot server serialises work that
+  the hardware could have batched.
+- **`n_busy_slots_per_decode` climbs to ~2**, not 8: batching is real but partial, so even this
+  configuration is not at its own ceiling.
+- **The cost of batching moved to inter-token latency** (7.6 → 25.6 ms) while TTFT stayed bounded at
+  ~207 ms. That is the healthy trade — aggregate up, tail controlled — and the opposite of what the
+  single-slot engine did.
+
+The conclusion for anyone paying for GPUs: **before optimising a kernel, count the slots.** The gap
+here (2.1× per token, 20× on the tail) is larger than anything a weight-decode kernel could deliver on
+this device — our own fused W4A16 attempt landed 12% *behind* plain fp16 cuBLAS.
+
+A prerequisite worth stating: this measurement needs a server that publishes its own state. ollama
+does not, which is exactly why the first round of this benchmark could only say "consistent with
+queueing". `llama-server`'s `/metrics` turned that into "measured": queue depth zero, batch width two.
+
+### Cost model
+
+`cost_model.py` turns any result file into $/1M output tokens at a given GPU price, plus the cheapest
+concurrency level that still meets a latency budget:
+
+| conc | aggregate tok/s | tok/hour | p95 TTFT | $/1M @ $0.20/h | $/1M @ $0.35/h |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 121.0 | 435 600 | 74.8 ms | $0.46 | $0.80 |
+| 8 | 253.7 | 913 320 | 206.8 ms | **$0.22** | $0.38 |
+
+Price is a parameter, not a claim about anyone's invoice; output tokens only, 100% duty cycle, one
+model resident. A real bill also charges prefill, which this measurement set does not contain.
+
 ## The three findings
 
 **1. Concurrency is paid in TTFT, not in ITL.** On the healthy config, inter-token latency is flat at
@@ -80,8 +132,12 @@ measurement is deliberately deferred, see below.
 
 ## What this is not
 
-- **Not a vLLM / SGLang benchmark.** Those aren't installed here; the backend is ollama/llama.cpp.
-  The harness is server-agnostic (any OpenAI-compatible endpoint) — pointing it at vLLM is the point.
+- **Not yet a vLLM / SGLang comparison.** vLLM 0.8.5.post1 is now installed alongside (CUDA verified)
+  and the same harness points at it; the tables above are ollama vs `llama-server`. The interesting
+  question — how far a PagedAttention engine gets past `busy_slots_per_decode ≈ 2` — is still open.
+- **Not a claim that configuration beats kernels always.** It beats kernels *here*, on this card, for
+  this workload. The point is the ordering of effort: measure the serving config before rewriting the
+  math.
 - **Not a model comparison.** See finding 2: the 7B number is a co-tenancy number.
 - **Not a statistical study.** One run per level, `n = 8` requests per level — enough to see the shape,
   not enough for confidence intervals. Repeats + CI are the obvious next step.
@@ -103,6 +159,14 @@ pip install aiohttp
 python3 bench.py --model qwen2.5:3b --concurrency 1,2,4,8 --requests 8 --max-tokens 128
 python3 bench.py --model qwen2.5:3b --concurrency 1,4 --requests 6 --prompt-mode unique
 python3 bench.py --model qwen2.5:7b --concurrency 1,2,4 --requests 6
+
+# with server-side counters (the run that produced the slot finding):
+#   /usr/lib/ollama/llama-server -m <model.gguf> -c 8192 -np 8 -cb --metrics --port 8081
+python3 bench.py --base-url http://127.0.0.1:8081 --model qwen25-3b \
+  --concurrency 1,2,4,8 --requests 8 --max-tokens 128 \
+  --metrics-url http://127.0.0.1:8081/metrics --json results/llamaserver-np8-gpu.json
+
+python3 cost_model.py --usd-per-hour 0.20,0.35,0.50   # -> cost_model.md
 ```
 
 `--prompt-mode same` reuses the server's prefix cache (a real production case); `unique` puts a nonce

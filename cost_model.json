@@ -11,6 +11,87 @@
   ],
   "runs": [
     {
+      "result_file": "llamaserver-np8-gpu.json",
+      "model": "qwen25-3b",
+      "prompt_mode": "same",
+      "levels": [
+        {
+          "concurrency": 1,
+          "agg_out_tps": 121.0,
+          "tok_per_hour": 435600.0,
+          "ttft_p95_ms": 74.8,
+          "usd_per_1m": {
+            "0.20": 0.46,
+            "0.35": 0.8,
+            "0.50": 1.15
+          }
+        },
+        {
+          "concurrency": 2,
+          "agg_out_tps": 180.7,
+          "tok_per_hour": 650520.0,
+          "ttft_p95_ms": 207.1,
+          "usd_per_1m": {
+            "0.20": 0.31,
+            "0.35": 0.54,
+            "0.50": 0.77
+          }
+        },
+        {
+          "concurrency": 4,
+          "agg_out_tps": 222.7,
+          "tok_per_hour": 801720.0,
+          "ttft_p95_ms": 254.3,
+          "usd_per_1m": {
+            "0.20": 0.25,
+            "0.35": 0.44,
+            "0.50": 0.62
+          }
+        },
+        {
+          "concurrency": 8,
+          "agg_out_tps": 253.7,
+          "tok_per_hour": 913320.0,
+          "ttft_p95_ms": 206.8,
+          "usd_per_1m": {
+            "0.20": 0.22,
+            "0.35": 0.38,
+            "0.50": 0.55
+          }
+        }
+      ],
+      "slo_best": {
+        "250ms": {
+          "concurrency": 8,
+          "agg_out_tps": 253.7,
+          "usd_per_1m": {
+            "0.20": 0.22,
+            "0.35": 0.38,
+            "0.50": 0.55
+          }
+        },
+        "500ms": {
+          "concurrency": 8,
+          "agg_out_tps": 253.7,
+          "usd_per_1m": {
+            "0.20": 0.22,
+            "0.35": 0.38,
+            "0.50": 0.55
+          }
+        },
+        "2000ms": {
+          "concurrency": 8,
+          "agg_out_tps": 253.7,
+          "usd_per_1m": {
+            "0.20": 0.22,
+            "0.35": 0.38,
+            "0.50": 0.55
+          }
+        }
+      },
+      "penalty_vs_best": 2.1
+    },
+    {
       "result_file": "qwen25-3b_same.json",
       "model": "qwen2.5:3b",
       "prompt_mode": "same",
