@@ -92,6 +92,12 @@ The mechanism is visible in the servers' own counters (`bench.py --metrics-url`)
 - **vLLM genuinely overlaps 8 requests** (`num_requests_running` = 8, zero preemptions) and pays for it
   in per-request decode speed (119.3 → 44.5 tok/s) while aggregate triples. That is continuous batching,
   measured rather than asserted.
+- **Prefix cache hit rate reached 96.97%** (`Prefix cache hit rate: GPU: 96.97%` in the engine log, after
+  0% → 94.12% on the first repetitions). With the same prompt repeated, vLLM answered almost entirely
+  from its prefix cache — which is *why* TTFT sits at 39–146 ms instead of paying a full prefill. Honest
+  consequence: every TTFT in this table is a **cache-hit** number. The cold-prefill case
+  (`--prompt-mode unique`) has been measured on ollama only (≈40 ms at C=1, the cache worth ≈6 ms there)
+  and belongs in the next round for vLLM.
 - The KV budget is the next wall, and it is a memory wall, not a compute one: at `--gpu-memory-utilization
   0.45` on this shared 8 GB card, vLLM reported `Maximum concurrency for 4096 tokens per request: 1.57x`
   — 401 GPU blocks, 0.22 GiB of KV. Short requests (≈518 tokens) fit 8 abreast at 13% cache usage;

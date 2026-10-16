@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-10-16 23:42:22",
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "engine": "vLLM 0.8.5.post1, GGUF (V0 engine), single GPU, --gpu-memory-utilization 0.45",
+  "prompt_mode": "same",
+  "max_tokens": 128,
+  "requests_per_level": 32,
+  "concurrency_levels": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32
+  ],
+  "host_note": "co-tenants hold ~2.8 GiB of the 8 GiB (TTS etc.); the KV budget is what is left",
+  "runs": [
+    {
+      "max_model_len": 1024,
+      "server_up": false,
+      "ready": "process exited with code 1",
+      "port": 8082,
+      "bench_ok": false,
+      "result_file": null,
+      "log": "vllm-mml1024.log",
+      "error_tail": "v_type[0])\n                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/gguf/gguf_reader.py\", line 248, in _get_field_parts\n    curr_size, curr_parts, curr_idxs, curr_types = self._get_field_parts(offs, raw_itype[0])\n                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/gguf/gguf_reader.py\", line 230, in _get_field_parts\n    sparts: list[npt.NDArray[Any]] = list(self._get_str(offs))\n                                          ^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/gguf/gguf_reader.py\", line 218, in _get_str\n    slen = self._get(offset, np.uint64)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/gguf/gguf_reader.py\", line 204, in _get\n    return arr.view(arr.dtype.newbyteorder(self.byte_order if override_order is None else override_order))\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/numpy/_core/memmap.py\", line 310, in __array_finalize__\n    def __array_finalize__(self, obj):\n\n  File \"/home/yegor/venvs/vllm/lib/python3.12/site-packages/vllm/entrypoints/openai/api_server.py\", line 1074, in signal_handler\n    raise KeyboardInterrupt(\"terminated\")\nKeyboardInterrupt: terminated\n"
+    }
+  ]
+}
