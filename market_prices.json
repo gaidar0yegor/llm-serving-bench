@@ -16,9 +16,11 @@
     "cache_in": 0.03,
     "ttft_ms": 409,
     "tps": 129,
+    "model_ids": ["zai-org/glm-5.3-flash", "/home/yegor/models/gguf/qwen2.5-3b-instruct-q4_k_m.gguf"],
     "source": "https://docs.z.ai/guides/overview/pricing ; https://www.requesty.ai/model/zai/glm-5.3-flash"
   },
   "deepseek-v4-flash (official)": {
+    "model_ids": ["deepseek-ai/deepseek-v4-flash"],
     "provider": "DeepSeek",
     "in": 0.14,
     "out": 0.28,

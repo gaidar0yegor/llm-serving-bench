@@ -370,6 +370,10 @@ async def main_async(args):
     timeout = aiohttp.ClientTimeout(total=args.timeout)
     api_key = args.api_key or (os.environ.get(args.api_key_env) if args.api_key_env else None)
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    for h in (args.header or []):                 # e.g. --header 'munito-service-tier: flex'
+        if ":" in h:
+            k, v = h.split(":", 1)
+            headers[k.strip()] = v.strip()
     if api_key:
         # the key is read from an env var / file and never printed, not even its length
         print(f"  auth: bearer key supplied via {args.api_key_env or '--api-key'}", flush=True)
@@ -473,6 +477,8 @@ def main():
     ap.add_argument("--api-key", default=None, help="bearer key for a remote provider (never printed)")
     ap.add_argument("--api-key-env", default=None,
                     help="name of an env var holding the key — preferred, so the key stays out of ps")
+    ap.add_argument("--header", action="append", default=None,
+                    help="extra request header, repeatable (e.g. --header 'munito-service-tier: flex')")
     ap.add_argument("--json", default="results.json")
     ap.add_argument("--metrics-url", default=None,
                     help="Prometheus endpoint (e.g. http://127.0.0.1:8081/metrics) to annotate each "
