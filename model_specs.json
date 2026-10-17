@@ -1,0 +1,28 @@
+{
+  "_note": "Model shape needed to compute KV-cache arithmetic without loading anything. Numbers below are the published Qwen2.5-3B layout; kv_per_token is derived, not copied.",
+  "qwen2.5-3b": {
+    "name": "Qwen2.5-3B-Instruct",
+    "n_layers": 36,
+    "n_q_heads": 16,
+    "n_kv_heads": 2,
+    "head_dim": 128,
+    "hidden_size": 2048,
+    "native_context": 32768,
+    "weights_gib_q4_k_m": 1.81,
+    "weights_gib_fp16": 6.17,
+    "source": "Qwen2.5-3B config.json (num_hidden_layers 36, num_attention_heads 16, num_key_value_heads 2, head_dim 128); weights = measured 1.81 GiB for Q4_K_M on this box"
+  },
+  "_kv_note": "kv_bytes_per_token = 2 (K and V) x n_kv_heads x head_dim x n_layers x dtype_bytes. For qwen2.5-3b in fp16: 2 x 2 x 128 x 36 x 2 = 36864 B = 36 KiB/token. Cross-checked against vLLM's own allocation on this card: 0.22 GiB / 401 blocks = 0.5625 MiB per 16-token block, i.e. exactly 16 x 36864 B.",
+  "glm-5.3-flash": {
+    "name": "GLM-5.3-Flash (shape unknown - placeholder to show the sensitivity, NOT a claim)",
+    "n_layers": 40,
+    "n_q_heads": 32,
+    "n_kv_heads": 8,
+    "head_dim": 128,
+    "hidden_size": 4096,
+    "native_context": 1048576,
+    "weights_gib_q4_k_m": 12.0,
+    "weights_gib_fp16": 40.0,
+    "source": "UNVERIFIED placeholder: the point of the calculator is that the KV footprint, not the FLOPs, decides how many long requests fit - substitute the real config to get a real answer"
+  }
+}
