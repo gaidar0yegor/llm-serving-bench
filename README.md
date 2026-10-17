@@ -210,6 +210,22 @@ this box **an input token is ~300× cheaper than an output token** — the input
 margin-dominated, the output side is where the cost actually is. Caveat: that is a 3B model on one
 8 GB card; prefill is compute-bound and grows with model size, so the ratio does not carry to a 30B.
 
+**The same curve on llama.cpp** (`-np 2 -cb`, `-c 24576`; `prefill_llamacpp.sh`), which sizes its KV cache
+explicitly and therefore *could* hold an 8k-token prompt where vLLM could not:
+
+| prompt tokens | C=1 TTFT p50 | C=1 p95 | C=2 p95 |
+|---:|---:|---:|---:|
+| 941 | 49.1 ms | 68.4 ms | 251.4 ms |
+| 1819 | 90.5 ms | 152.2 ms | 523.8 ms |
+| 3573 | 111.5 ms | 118.2 ms | 954.9 ms |
+| 7083 | 207.4 ms | 352.2 ms | 1943.2 ms |
+
+Fit (residuals within ±13 ms, slope good to ~±15%): TTFT = 32.7 ms + **24.4 µs/token** → 41 000 tokens/s
+of marginal prefill, i.e. **~3.4× slower per prefill token than vLLM** (7.14 µs) and $0.0014/1M input
+tokens. The trade is memory against prefill speed, and it cuts both ways: the engine that prefills 3.4×
+faster is the one that could not fit an 8k prompt on this card, because it budgets memory as a fraction
+of the *total* while 3.7 GiB of it is held by co-tenants.
+
 **And this is where the KV budget finally bites.** With 397 KV blocks (6 352 tokens of cache), one
 3 571-token request fits and four do not: at C=4 the p95 TTFT jumps from 64 ms to **1868 ms** while the
 short-prompt sweep showed the same cache at 3–6% used. The concurrency ceiling that looked irrelevant

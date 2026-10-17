@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-10-17 16:58:29",
+  "prompt_mode": "unique",
+  "prompt_tokens_target": 4096,
+  "prompt_chars": 16553,
+  "max_tokens": 32,
+  "requests_per_level": 6,
+  "concurrency_levels": [
+    1,
+    2
+  ],
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "host_note": "cold prefill on llama.cpp; co-tenants hold ~3.7 GiB of the card",
+  "models": [
+    {
+      "model": "qwen25-3b",
+      "warmup_s": 0.79,
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests_ok": 6,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 2.133,
+          "prompt_tokens_mean": 3573,
+          "ttft_p50_ms": 111.5,
+          "ttft_p95_ms": 118.2,
+          "itl_p50_ms": 7.81,
+          "itl_p95_ms": 8.13,
+          "decode_tps_p50": 128.1,
+          "agg_out_tps": 90.0,
+          "out_tokens_total": 192,
+          "token_count_source": "usage",
+          "server": {
+            "prompt_tokens_total": 9043.0,
+            "prompt_tokens_cached_total": 51848.0,
+            "requests_processing": 1.0,
+            "requests_deferred": 0.0,
+            "n_busy_slots_per_decode": 1.31
+          }
+        },
+        {
+          "concurrency": 2,
+          "requests_ok": 6,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 2.348,
+          "prompt_tokens_mean": 3573,
+          "ttft_p50_ms": 244.7,
+          "ttft_p95_ms": 954.9,
+          "itl_p50_ms": 9.72,
+          "itl_p95_ms": 23.67,
+          "decode_tps_p50": 102.7,
+          "agg_out_tps": 81.8,
+          "out_tokens_total": 192,
+          "token_count_source": "usage",
+          "server": {
+            "prompt_tokens_total": 12595.0,
+            "prompt_tokens_cached_total": 69734.0,
+            "requests_processing": 2.0,
+            "requests_deferred": 0.0,
+            "n_busy_slots_per_decode": 1.32
+          }
+        }
+      ]
+    }
+  ],
+  "base_url": "http://127.0.0.1:8081",
+  "vram_peak_mib": 6883,
+  "vram_note": ""
+}

@@ -1,0 +1,71 @@
+{
+  "generated_at": "2026-10-17 16:58:35",
+  "prompt_mode": "unique",
+  "prompt_tokens_target": 8192,
+  "prompt_chars": 33060,
+  "max_tokens": 32,
+  "requests_per_level": 6,
+  "concurrency_levels": [
+    1,
+    2
+  ],
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "host_note": "cold prefill on llama.cpp; co-tenants hold ~3.7 GiB of the card",
+  "models": [
+    {
+      "model": "qwen25-3b",
+      "warmup_s": 1.78,
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests_ok": 6,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 2.846,
+          "prompt_tokens_mean": 7083,
+          "ttft_p50_ms": 207.4,
+          "ttft_p95_ms": 352.2,
+          "itl_p50_ms": 7.72,
+          "itl_p95_ms": 7.88,
+          "decode_tps_p50": 129.5,
+          "agg_out_tps": 67.5,
+          "out_tokens_total": 192,
+          "token_count_source": "usage",
+          "server": {
+            "prompt_tokens_total": 19657.0,
+            "prompt_tokens_cached_total": 112253.0,
+            "requests_processing": 1.0,
+            "requests_deferred": 0.0,
+            "n_busy_slots_per_decode": 1.32
+          }
+        },
+        {
+          "concurrency": 2,
+          "requests_ok": 6,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 3.875,
+          "prompt_tokens_mean": 7083,
+          "ttft_p50_ms": 488.2,
+          "ttft_p95_ms": 1943.2,
+          "itl_p50_ms": 10.1,
+          "itl_p95_ms": 64.86,
+          "decode_tps_p50": 98.8,
+          "agg_out_tps": 49.5,
+          "out_tokens_total": 192,
+          "token_count_source": "usage",
+          "server": {
+            "prompt_tokens_total": 26718.0,
+            "prompt_tokens_cached_total": 147690.0,
+            "requests_processing": 2.0,
+            "requests_deferred": 0.0,
+            "n_busy_slots_per_decode": 1.32
+          }
+        }
+      ]
+    }
+  ],
+  "base_url": "http://127.0.0.1:8081",
+  "vram_peak_mib": 6883,
+  "vram_note": ""
+}
