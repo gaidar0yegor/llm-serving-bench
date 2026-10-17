@@ -153,7 +153,7 @@ class MetricsSampler(threading.Thread):
 
 # ---------------------------------------------------------------- one request
 
-async def one_request(session, url, model, prompt, max_tokens, timeout):
+async def one_request(session, url, model, prompt, max_tokens, timeout, reasoning_effort=None):
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
@@ -163,10 +163,14 @@ async def one_request(session, url, model, prompt, max_tokens, timeout):
         "stream": True,
         "stream_options": {"include_usage": True},   # exact token counts when supported
     }
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
     t0 = time.perf_counter()
-    ttft = None
+    ttft = None                    # first token of ANY kind: what the user sees first
+    ttft_answer = None             # first *answer* token; on a reasoning model this comes much later
     t_first = t_last = None
     deltas = 0
+    content_deltas = 0
     usage = None
     err = None
     try:
@@ -188,12 +192,22 @@ async def one_request(session, url, model, prompt, max_tokens, timeout):
                 if obj.get("usage"):
                     usage = obj["usage"]
                 for ch in obj.get("choices") or []:
-                    txt = (ch.get("delta") or {}).get("content")
-                    if txt:
+                    delta = ch.get("delta") or {}
+                    # a reasoning model streams its thinking in `reasoning`/`reasoning_content`
+                    # and its answer in `content`; counting only `content` is how a harness reports
+                    # "no token received" on a server that answered perfectly well.
+                    for field in ("reasoning", "reasoning_content", "content"):
+                        txt = delta.get(field)
+                        if not txt:
+                            continue
                         now = time.perf_counter()
                         if ttft is None:
                             ttft = now - t0
                             t_first = now
+                        if field == "content":
+                            if ttft_answer is None:
+                                ttft_answer = now - t0
+                            content_deltas += 1
                         t_last = now
                         deltas += 1
     except Exception as e:                          # noqa: BLE001 - we report, not hide
@@ -203,19 +217,26 @@ async def one_request(session, url, model, prompt, max_tokens, timeout):
     if err:
         return {"error": err}
     if ttft is None:
-        return {"error": "no content token received"}
+        return {"error": "no token received"}
 
-    out_tokens = (usage or {}).get("completion_tokens") or deltas
-    prompt_tokens = (usage or {}).get("prompt_tokens")
+    usage = usage or {}
+    details = usage.get("completion_tokens_details") or {}
+    out_tokens = usage.get("completion_tokens") or deltas          # billed: includes reasoning
     return {
         "ttft_ms": ttft * 1000,
+        "ttft_answer_ms": (ttft_answer * 1000) if ttft_answer is not None else None,
         "latency_ms": (t_end - t0) * 1000,
         "out_tokens": out_tokens,
+        "content_tokens": content_deltas or None,
+        "reasoning_tokens": details.get("reasoning_tokens"),
         "token_count_source": "usage" if usage else "stream_deltas",
-        "prompt_tokens": prompt_tokens,
+        "prompt_tokens": usage.get("prompt_tokens"),
+        "cached_prompt_tokens": (usage.get("prompt_tokens_details") or {}).get("cached_tokens"),
         # inter-token latency: gaps *between* decoded tokens, so n-1 gaps
-        "itl_ms": ((t_last - t_first) / (out_tokens - 1) * 1000) if out_tokens > 1 else None,
-        "decode_tps": ((out_tokens - 1) / (t_last - t_first)) if out_tokens > 1 and t_last > t_first else None,
+        "itl_ms": ((t_last - t_first) / (deltas - 1) * 1000)
+        if (deltas > 1 and t_first is not None and t_last is not None) else None,
+        "decode_tps": ((deltas - 1) / (t_last - t_first))
+        if (deltas > 1 and t_first is not None and t_last is not None and t_last > t_first) else None,
     }
 
 
@@ -228,7 +249,8 @@ async def run_level(session, args, model, prompt, concurrency, requests, sampler
     while done < requests:
         batch = min(concurrency, requests - done)
         inflight = [
-            asyncio.create_task(one_request(session, args.url, model, prompt, args.max_tokens, args.timeout))
+            asyncio.create_task(one_request(session, args.url, model, prompt, args.max_tokens,
+                                             args.timeout, getattr(args, "reasoning_effort", None)))
             for _ in range(batch)
         ]
         results.extend(await asyncio.gather(*inflight))
@@ -245,10 +267,18 @@ def pct(values, p):
     return values[k]
 
 
+def r1(v, nd=1):
+    """pct() returns None for an empty sample; round(None) is a crash, and a crash hides the failures
+    that produced the empty sample. A remote server answering errors must land in the report."""
+    return round(v, nd) if v is not None else None
+
+
 def summarize(results, wall, concurrency):
     ok = [r for r in results if "error" not in r]
     bad = [r for r in results if "error" in r]
     ttfts = [r["ttft_ms"] for r in ok]
+    answers = [r["ttft_answer_ms"] for r in ok if r.get("ttft_answer_ms") is not None]
+    reason_toks = [r["reasoning_tokens"] for r in ok if r.get("reasoning_tokens") is not None]
     itls = [r["itl_ms"] for r in ok if r["itl_ms"]]
     prompts = [r["prompt_tokens"] for r in ok if r.get("prompt_tokens")]
     total_out = sum(r["out_tokens"] for r in ok)
@@ -260,13 +290,18 @@ def summarize(results, wall, concurrency):
         "wall_s": round(wall, 3),
         # the server's own count of the prefix it had to ingest — the input half of the invoice
         "prompt_tokens_mean": round(sum(prompts) / len(prompts)) if prompts else None,
-        "ttft_p50_ms": round(pct(ttfts, 50), 1) if ttfts else None,
-        "ttft_p95_ms": round(pct(ttfts, 95), 1) if ttfts else None,
-        "itl_p50_ms": round(pct(itls, 50), 2) if itls else None,
-        "itl_p95_ms": round(pct(itls, 95), 2) if itls else None,
-        "decode_tps_p50": round(pct([r["decode_tps"] for r in ok if r["decode_tps"]], 50), 1) or None,
+        "ttft_p50_ms": r1(pct(ttfts, 50)),
+        "ttft_p95_ms": r1(pct(ttfts, 95)),
+        # on a reasoning model the first *answer* token lands long after the first token of any kind
+        "ttft_answer_p50_ms": r1(pct(answers, 50)),
+        "ttft_answer_p95_ms": r1(pct(answers, 95)),
+        "reasoning_tokens_mean": round(sum(reason_toks) / len(reason_toks)) if reason_toks else None,
+        "itl_p50_ms": r1(pct(itls, 50), 2),
+        "itl_p95_ms": r1(pct(itls, 95), 2),
+        "decode_tps_p50": r1(pct([r["decode_tps"] for r in ok if r["decode_tps"]], 50)) or None,
         "agg_out_tps": round(total_out / wall, 1) if wall > 0 else None,
         "out_tokens_total": total_out,
+        "content_deltas_total": sum(r["content_tokens"] or 0 for r in ok) or None,
         "token_count_source": (ok[0]["token_count_source"] if ok else None),
     }
 
@@ -325,6 +360,7 @@ async def main_async(args):
         "prompt_tokens_target": args.prompt_tokens,
         "prompt_chars": len(prompt),
         "max_tokens": args.max_tokens,
+        "reasoning_effort": getattr(args, "reasoning_effort", None),
         "requests_per_level": args.requests,
         "concurrency_levels": concurrency,
         "gpu": os.environ.get("BENCH_GPU", "NVIDIA GeForce RTX 3060 Ti (8 GB)"),
@@ -332,14 +368,20 @@ async def main_async(args):
         "models": [],
     }
     timeout = aiohttp.ClientTimeout(total=args.timeout)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    api_key = args.api_key or (os.environ.get(args.api_key_env) if args.api_key_env else None)
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    if api_key:
+        # the key is read from an env var / file and never printed, not even its length
+        print(f"  auth: bearer key supplied via {args.api_key_env or '--api-key'}", flush=True)
+    async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
         report.update(await server_meta(session, args.base_url))
         for model in args.model.split(","):
             model = model.strip()
             print(f"\n=== {model} ===", flush=True)
             # warmup: loads weights + allocates KV cache, excluded from the numbers
             t_warm = time.perf_counter()
-            warm = await one_request(session, url, model, prompt, 8, args.timeout)
+            warm = await one_request(session, url, model, prompt, 8, args.timeout,
+                                     getattr(args, "reasoning_effort", None))
             warm_s = time.perf_counter() - t_warm
             print(f"  warmup: {warm_s:.1f}s {'OK' if 'error' not in warm else warm['error']}", flush=True)
             levels = []
@@ -386,8 +428,13 @@ def to_markdown(rep):
     for m in rep["models"]:
         lines.append(f"\n**{m['model']}** (warmup {m['warmup_s']} s)\n")
         has_server = any("server" in r and "error" not in r.get("server", {}) for r in m["levels"])
+        has_reasoning = any(r.get("ttft_answer_p50_ms") is not None or r.get("reasoning_tokens_mean")
+                            is not None for r in m["levels"])
         head = "| conc | ttft p50 | ttft p95 | itl p50 | itl p95 | decode tok/s | aggregate tok/s | failed |"
         sep = "|---:|---:|---:|---:|---:|---:|---:|---:|"
+        if has_reasoning:
+            head += " ttft *answer* p50 | reasoning tok/req |"
+            sep += "---:|---:|"
         if has_server:
             head += " processing | deferred | busy slots/decode |"
             sep += "---:|---:|---:|"
@@ -397,6 +444,9 @@ def to_markdown(rep):
             line = (f"| {r['concurrency']} | {r['ttft_p50_ms']} ms | {r['ttft_p95_ms']} ms | "
                     f"{r['itl_p50_ms']} ms | {r['itl_p95_ms']} ms | {r['decode_tps_p50']} | "
                     f"{r['agg_out_tps']} | {r['requests_failed']} |")
+            if has_reasoning:
+                line += (f" {r.get('ttft_answer_p50_ms', '—')} ms | "
+                         f"{r.get('reasoning_tokens_mean', '—')} |")
             if has_server:
                 s = r.get("server", {})
                 line += (f" {s.get('requests_processing','—')} | {s.get('requests_deferred','—')} | "
@@ -416,7 +466,13 @@ def main():
                     help="approximate prompt length in tokens (the reported count still comes from the "
                          "server's usage). Use with --prompt-mode unique to price cold prefill.")
     ap.add_argument("--prompt-mode", choices=["same", "unique"], default="same")
+    ap.add_argument("--reasoning-effort", choices=["low", "high", "max"], default=None,
+                    help="for reasoning models that accept it (Munito's flash models do): controls the "
+                         "thinking budget, which is billed as output tokens")
     ap.add_argument("--timeout", type=float, default=300)
+    ap.add_argument("--api-key", default=None, help="bearer key for a remote provider (never printed)")
+    ap.add_argument("--api-key-env", default=None,
+                    help="name of an env var holding the key — preferred, so the key stays out of ps")
     ap.add_argument("--json", default="results.json")
     ap.add_argument("--metrics-url", default=None,
                     help="Prometheus endpoint (e.g. http://127.0.0.1:8081/metrics) to annotate each "

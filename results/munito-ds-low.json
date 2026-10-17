@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-10-17 18:35:56",
+  "prompt_mode": "unique",
+  "prompt_tokens_target": null,
+  "prompt_chars": 2902,
+  "max_tokens": 512,
+  "reasoning_effort": "low",
+  "requests_per_level": 4,
+  "concurrency_levels": [
+    1,
+    4
+  ],
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "host_note": "",
+  "models": [
+    {
+      "model": "deepseek-ai/deepseek-v4-flash",
+      "warmup_s": 0.3,
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests_ok": 4,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 11.083,
+          "prompt_tokens_mean": 626,
+          "ttft_p50_ms": 318.4,
+          "ttft_p95_ms": 483.0,
+          "ttft_answer_p50_ms": 1868.1,
+          "ttft_answer_p95_ms": 2452.0,
+          "reasoning_tokens_mean": 265,
+          "itl_p50_ms": 20.41,
+          "itl_p95_ms": 23.13,
+          "decode_tps_p50": 54.1,
+          "agg_out_tps": 132.7,
+          "out_tokens_total": 1471,
+          "content_deltas_total": 158,
+          "token_count_source": "usage"
+        },
+        {
+          "concurrency": 4,
+          "requests_ok": 4,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 3.394,
+          "prompt_tokens_mean": 626,
+          "ttft_p50_ms": 320.0,
+          "ttft_p95_ms": 350.1,
+          "ttft_answer_p50_ms": 2331.2,
+          "ttft_answer_p95_ms": 2660.2,
+          "reasoning_tokens_mean": 246,
+          "itl_p50_ms": 21.82,
+          "itl_p95_ms": 22.34,
+          "decode_tps_p50": 46.9,
+          "agg_out_tps": 401.3,
+          "out_tokens_total": 1362,
+          "content_deltas_total": 145,
+          "token_count_source": "usage"
+        }
+      ]
+    }
+  ],
+  "base_url": "https://api.munito.ai/inference",
+  "vram_peak_mib": 3920,
+  "vram_note": ""
+}
