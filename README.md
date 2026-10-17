@@ -180,6 +180,43 @@ concurrency level that still meets a latency budget:
 Price is a parameter, not a claim about anyone's invoice; output tokens only, 100% duty cycle, one
 model resident. A real bill also charges prefill, which this measurement set does not contain.
 
+## Cold prefill: where the input half of the invoice goes
+
+Everything above prices *output* tokens. A real invoice also bills the prompt, and the prompt is where
+long-context agents live. So: one vLLM server, prompts of ~1k / 2k / 4k tokens, **every prompt unique**
+(the prefix cache cannot answer for it → genuine cold prefill), concurrency 1/2/4, 64 output tokens.
+`prefill_profile.py` runs it; raw JSON in `results/prefill-*.json`.
+
+| prompt tokens (server's own count) | C=1 TTFT p50 | C=1 p95 | C=2 p95 | C=4 p95 |
+|---:|---:|---:|---:|---:|
+| 942 | 46.1 ms | 59.3 ms | 91.1 ms | 144.7 ms |
+| 1822 | 50.0 ms | 53.1 ms | 91.4 ms | 148.7 ms |
+| 3571 | 64.4 ms | 71.6 ms | 664.2 ms | **1868.2 ms** |
+
+A single rate ("tokens/s of prefill") is the wrong model here — it climbs with length (20k → 36k → 55k
+tok/s) because it silently amortises a fixed per-request cost. Least-squares on the three C=1 points
+fits within 1.5 ms:
+
+> **TTFT_p50 (C=1) = 38.4 ms + 7.14 µs/token** → a request costs ~38 ms before any prompt is read, and
+> ~140 000 tokens/s marginal prefill.
+
+That fixed part is what a short request actually pays: at 942 tokens, 46 ms of which ~6 ms is prefill.
+It is client + HTTP + one decode step + kernel launches, and it is why prefix caching is worth so much
+on chat workloads.
+
+**The money.** Marginal prefill at $0.20/GPU-h is **$0.0004 per 1M input tokens** ($0.0027 if you also
+charge the fixed 38 ms); market input prices are $0.12–0.15/1M. Measured output costs $0.130/1M. So on
+this box **an input token is ~300× cheaper than an output token** — the input side of a bill is
+margin-dominated, the output side is where the cost actually is. Caveat: that is a 3B model on one
+8 GB card; prefill is compute-bound and grows with model size, so the ratio does not carry to a 30B.
+
+**And this is where the KV budget finally bites.** With 397 KV blocks (6 352 tokens of cache), one
+3 571-token request fits and four do not: at C=4 the p95 TTFT jumps from 64 ms to **1868 ms** while the
+short-prompt sweep showed the same cache at 3–6% used. The concurrency ceiling that looked irrelevant
+for chat is exactly what limits *long* requests — the same lever, now doing the damage it exists for.
+
+
+
 ## The three findings
 
 **1. Concurrency is paid in TTFT, not in ITL.** On the healthy config, inter-token latency is flat at
@@ -229,8 +266,9 @@ measurement is deliberately deferred, see below.
    that GGUF quantization is "not fully optimized", which is the most likely reason throughput saturates
    at ~420 tok/s on short requests. AWQ / GPTQ / fp16 safetensors would test whether the ceiling moves —
    the one remaining experiment that can distinguish "this card" from "this quant path".
-3. **Cold prefill for vLLM** (`--prompt-mode unique`): every TTFT here is a prefix-cache hit, so the
-   prefill half of an invoice is still unpriced.
+3. **Cold prefill past 4k tokens on vLLM** — done to 3.6k tokens (see "Cold prefill"); the 8k point needs
+   either free VRAM for a bigger KV/graph budget or an engine that sizes memory explicitly (llama.cpp,
+   measured separately in `results/prefill-llamacpp-*.json`).
 4. ~~Context/KV-cache sweep~~ — **done**, see "The KV budget": the ceiling moves, throughput does not.
 
 ## Reproduce
@@ -268,6 +306,20 @@ python3 kv_compare.py --sweeps results/kv-sweep.json results/kv-sweep-util045.js
   results/kv-sweep-util055.json --usd-per-hour 0.20 --md results/kv-compare.md
 python3 margin_model.py --results results/vllm-gguf-mml4096.json \
   --market market_prices.json --usd-per-hour 0.20,0.35 --md results/margin-glm-ds.md
+```
+
+### Reproducing the cold-prefill profile
+
+```bash
+# vLLM, prompts up to 4k tokens; --prompt-mode unique defeats the prefix cache
+python3 prefill_profile.py --prompt-tokens 1024,2048,4096 --concurrency 1,2,4 --requests 6 \
+  --max-tokens 64 --max-model-len 4608 --gpu-memory-utilization 0.45 --usd-per-hour 0.20,0.35
+
+# the same curve on llama.cpp, which sizes its KV cache explicitly and reaches 8k prompts on this
+# card (vLLM could not: --gpu-memory-utilization is a fraction of TOTAL memory, and with the TTS
+# co-tenants holding ~3.7 GiB of the 7.66 GiB the card reports, 0.55 asked for more than exists and
+# died with CUDA OOM during cudagraph capture — a budget must be computed from FREE memory, not total)
+bash prefill_llamacpp.sh 1024,2048,4096,8192
 ```
 
 Server logs for every configuration were kept locally in `kv-logs/` (git-ignored, they run to hundreds of
