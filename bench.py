@@ -296,6 +296,8 @@ def summarize(results, wall, concurrency):
         "ttft_answer_p50_ms": r1(pct(answers, 50)),
         "ttft_answer_p95_ms": r1(pct(answers, 95)),
         "reasoning_tokens_mean": round(sum(reason_toks) / len(reason_toks)) if reason_toks else None,
+        "cached_tokens_mean": round(sum(cch) / len(cch)) if (cch := [r["cached_prompt_tokens"] for r in ok
+                                                                 if r.get("cached_prompt_tokens") is not None]) else None,
         "itl_p50_ms": r1(pct(itls, 50), 2),
         "itl_p95_ms": r1(pct(itls, 95), 2),
         "decode_tps_p50": r1(pct([r["decode_tps"] for r in ok if r["decode_tps"]], 50)) or None,

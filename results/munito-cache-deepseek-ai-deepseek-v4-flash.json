@@ -1,0 +1,46 @@
+{
+  "generated_at": "2026-10-19 12:35:32",
+  "prompt_mode": "same",
+  "prompt_tokens_target": null,
+  "prompt_chars": 2855,
+  "max_tokens": 256,
+  "reasoning_effort": null,
+  "requests_per_level": 6,
+  "concurrency_levels": [
+    1
+  ],
+  "gpu": "NVIDIA GeForce RTX 3060 Ti (8 GB)",
+  "host_note": "",
+  "models": [
+    {
+      "model": "deepseek-ai/deepseek-v4-flash",
+      "warmup_s": 0.33,
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests_ok": 6,
+          "requests_failed": 0,
+          "errors": [],
+          "wall_s": 13.239,
+          "prompt_tokens_mean": 682,
+          "ttft_p50_ms": 158.0,
+          "ttft_p95_ms": 237.8,
+          "ttft_answer_p50_ms": 1770.0,
+          "ttft_answer_p95_ms": 3789.5,
+          "reasoning_tokens_mean": 214,
+          "cached_tokens_mean": 469,
+          "itl_p50_ms": 18.1,
+          "itl_p95_ms": 37.71,
+          "decode_tps_p50": 54.9,
+          "agg_out_tps": 108.4,
+          "out_tokens_total": 1435,
+          "content_deltas_total": 53,
+          "token_count_source": "usage"
+        }
+      ]
+    }
+  ],
+  "base_url": "https://api.munito.ai/inference",
+  "vram_peak_mib": 4825,
+  "vram_note": ""
+}
